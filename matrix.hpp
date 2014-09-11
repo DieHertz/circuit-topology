@@ -21,7 +21,13 @@ public:
 
     std::size_t size() const { return m[row].size(); }
 
-    row_view& operator=(const row_view& rhs) {
+    row_view<T, matrix<T>> operator*(const T rhs) const {
+        row_view<T, matrix<T>> result{m, row};
+        return result *= rhs;
+    }
+
+    template<typename other_container>
+    row_view& operator=(const row_view<T, other_container>& rhs) {
         if (size() != rhs.size()) throw std::runtime_error{"rows have different dimensions"};
 
         for (const auto index : ext::range(0, size())) {
@@ -31,7 +37,8 @@ public:
         return *this;
     }
 
-    row_view& operator+=(const row_view& rhs) {
+    template<typename other_container>
+    row_view& operator+=(const row_view<T, other_container>& rhs) {
         if (size() != rhs.size()) throw std::runtime_error{"rows have different dimensions"};
 
         for (const auto index : ext::range(0, size())) {
@@ -41,7 +48,8 @@ public:
         return *this;
     }
 
-    row_view& operator-=(const row_view& rhs) {
+    template<typename other_container>
+    row_view& operator-=(const row_view<T, other_container>& rhs) {
         if (size() != rhs.size()) throw std::runtime_error{"rows have different dimensions"};
 
         for (const auto index : ext::range(0, size())) {
@@ -51,7 +59,8 @@ public:
         return *this;
     }
 
-    row_view& operator*=(const row_view& rhs) {
+    template<typename other_container>
+    row_view& operator*=(const row_view<T, other_container>& rhs) {
         if (size() != rhs.size()) throw std::runtime_error{"rows have different dimensions"};
 
         for (const auto index : ext::range(0, size())) {
@@ -61,7 +70,8 @@ public:
         return *this;
     }
 
-    row_view& operator/=(const row_view& rhs) {
+    template<typename other_container>
+    row_view& operator/=(const row_view<T, other_container>& rhs) {
         if (size() != rhs.size()) throw std::runtime_error{"rows have different dimensions"};
 
         for (const auto index : ext::range(0, size())) {
@@ -129,10 +139,10 @@ namespace std {
     void swap(row_view<T> one, row_view<T> another) { one.swap(another); }
 }
 
-template<typename T>
+template<typename T, typename container = matrix<T>&>
 class column_view {
 public:
-    column_view(matrix<T>& m, const std::size_t col)
+    column_view(container m, const std::size_t col)
         : m(m), col{col < m.size() ? col : throw std::runtime_error{"column out of bounds"}} {}
 
     T& operator[](const std::size_t row) { return m[row][col]; }
@@ -141,13 +151,13 @@ public:
     std::size_t size() const { return m.size(); }
 
 private:
-    matrix<T>& m;
+    container m;
     const std::size_t col;
 };
 
 template<typename T>
 bool is_zero_col(const std::size_t row_start, const std::size_t col, const matrix<T>& a) {
-	for (std::size_t row = row_start, row_num = a.size(); row < row_num; ++row) {
+    for (const auto row : ext::range(row_start, a.size())) {
 	    if (!is_equal(a[row][col], T{})) return false;
 	}
 
@@ -161,7 +171,7 @@ template<typename T> void copy_col(const matrix<T>& from, const std::size_t col_
         throw std::logic_error{"the matrices passed to copy_col have a different number of rows"};
     }
 
-    for (std::size_t row = 0; row < row_num; ++row) {
+    for (const auto row : ext::range(0, row_num)) {
         to[row][col_to] = from[row][col_from];
     }
 }
@@ -274,19 +284,42 @@ matrix<T> inverse(matrix<T> m) {
         if (is_equal(m[col][col], T{})) {
             for (const auto row : ext::range(col + 1, n)) {
                 if (!is_equal(m[row][col], T{})) {
-                    std::swap(row_view<T>(m, col), row_view<T>(m, row));
-                    std::swap(row_view<T>(result, col), row_view<T>(result, row));
+                    std::swap(row_view<T>{m, col}, row_view<T>{m, row});
+                    std::swap(row_view<T>{result, col}, row_view<T>{result, row});
                     break;
                 }
             }
         }
 
         // could not find non-zero element
-        if (is_equal(m[col][col], T{})) throw std::runtime_error{"the matrix is singular"};
+        const auto el = m[col][col];
+        if (is_equal(el, T{})) throw std::runtime_error{"the matrix is singular"};
+
+        // normalize row
+        row_view<T>{m, col} /= el;
+        row_view<T>{result, col} /= el;
 
         // zero out all the rows below the main diagonal
         for (const auto row : ext::range(col + 1, n)) {
+            const auto el = m[row][col];
+            if (is_equal(el, T{})) continue;
 
+            row_view<T>{m, row} -= row_view<T, matrix<T>>{m, col} * el;
+            row_view<T>{result, row} -= row_view<T, matrix<T>>{result, col} * el;
+        }
+    }
+
+    // backward elimination
+    for (const auto col_backwards : ext::range(0, n)) {
+        const auto col = n - col_backwards - 1;
+
+        for (const auto row_backwards : ext::range(col_backwards + 1, n)) {
+            const auto row = n - row_backwards - 1;
+            const auto el = m[row][col];
+            if (is_equal(el, T{})) continue;
+
+            row_view<T>{m, row} -= row_view<T, matrix<T>>{m, col} * el;
+            row_view<T>{result, row} -= row_view<T, matrix<T>>{result, col} * el;
         }
     }
 
@@ -301,11 +334,10 @@ matrix<T> operator*(const matrix<T>& lhs, const matrix<T>& rhs) {
     if (n != p) throw std::runtime_error{"inner dimensions of the matrix product operands do not match"};
 
     matrix<T> result{m, std::vector<T>(r)};
-
-    for (std::size_t i = 0; i < m; ++i) {
-        for (std::size_t j = 0; j < r; ++i) {
-            for (std::size_t k = 0; k < n; ++k) {
-                result[i][j] = lhs[i][k] * rhs[k][j];
+    for (const auto i : ext::range(0, m)) {
+        for (const auto j : ext::range(0, r)) {
+            for (const auto k : ext::range(0, n)) {
+                result[i][j] += lhs[i][k] * rhs[k][j];
             }
         }
     }

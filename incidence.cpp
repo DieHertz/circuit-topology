@@ -41,11 +41,13 @@ int main() {
     std::cout << "A[A_T | A_L]:\n" << a << std::endl;
 
     const auto a_t = slice(a, independent_node_num, independent_node_num);
-    std::cout << "A_T:\n" << a_t << std::endl;
+    // std::cout << "A_T:\n" << a_t << std::endl;
 
     const auto a_l = slice(a, independent_node_num, branch_num - (independent_node_num), 0, independent_node_num);
-    std::cout << "A_L:\n" << a_l << std::endl;
+    // std::cout << "A_L:\n" << a_l << std::endl;
 
     const auto a_t_inv = inverse(a_t);
     std::cout << "inv(A_T):\n" << a_t_inv << std::endl;
+
+    std::cout << a_t * a_t_inv << std::endl;
 }
