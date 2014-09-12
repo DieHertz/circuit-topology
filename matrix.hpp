@@ -167,31 +167,52 @@ matrix<T> slice(const matrix<T>& m, const std::size_t row_num, const std::size_t
                 const std::size_t row_start = 0, const std::size_t col_start = 0) {
     matrix<T> result{row_num};
 
-    for (std::size_t i = 0; i < row_num; ++i)
+	for (const auto i : ext::range(0, row_num)) {
     	result[i].assign(std::begin(m[row_start + i]) + col_start, std::begin(m[row_start + i]) + col_start + col_num);
+	}
 
     return result;
 }
 
-template<typename T1, typename T2>
-matrix<typename std::common_type<T1, T2>::type> augment(const matrix<T1>& lhs, const matrix<T2>& rhs) {
-    const auto n = lhs.size();
-    if (n != rhs.size()) throw std::runtime_error{"cannot augment matrices with different number of rows"};
+template<typename It>
+inline void augment_impl(It&, std::size_t) {}
+template<typename It, typename Arg, typename... Args>
+inline void augment_impl(It& it, const std::size_t i, const matrix<Arg>& arg, const matrix<Args>&... args) {
+	std::copy(std::begin(arg[i]), std::end(arg[i]), it);
+	augment_impl(it, i, args...);
+}
 
-    const auto m_lhs = lhs.front().size();
-    const auto m_rhs = rhs.front().size();
-    const auto m = m_lhs + m_rhs;
-    matrix<typename std::common_type<T1, T2>::type> result{n};
+inline bool check_row_num(const std::size_t) { return true; }
+template<typename Arg, typename... Args>
+inline bool check_row_num(const std::size_t row_num, const matrix<Arg>& arg, const matrix<Args>&... args) {
+	return row_num == arg.size() ? check_row_num(row_num, args...) : false;
+}
 
-    for (const auto i : ext::range(0, n)) {
-        auto& row = result[i];
-        row.reserve(m);
+inline std::size_t get_total_length() { return 0; }
+template<typename Arg, typename... Args>
+inline std::size_t get_total_length(const matrix<Arg>& arg, const matrix<Args>&... args) {
+	return arg.front().size() + get_total_length(args...);
+}
 
-        std::copy(std::begin(lhs[i]), std::end(lhs[i]), std::back_inserter(row));
-        std::copy(std::begin(rhs[i]), std::end(rhs[i]), std::back_inserter(row));
-    }
+template<typename Arg, typename... Args>
+matrix<typename std::common_type<Arg, Args...>::type> augment(const matrix<Arg>& arg, const matrix<Args>&... args) {
+	const auto n = arg.size();
+	if (!check_row_num(n, args...)) {
+		throw std::runtime_error{"cannot augment matrices with different number of rows"};
+	}
 
-    return result;
+	const auto m = get_total_length(arg, args...);
+    matrix<typename std::common_type<Arg, Args...>::type> result{n};
+
+	for (const auto i : ext::range(0, n)) {
+		auto& row = result[i];
+		row.reserve(m);
+		auto it = std::back_inserter(row);
+
+		augment_impl(it, i, arg, args...);
+	}
+
+	return result;
 }
 
 namespace {
@@ -199,7 +220,7 @@ namespace {
     struct continue_on_zero_row {};
 
     inline void gauss_elimination_handle_zero_row(throw_on_zero_row) {
-        throw std::runtime_error{"a zero row encountered while performing elimination"};
+        throw std::runtime_error{"the matrix is inconsistent"};
     }
 
     inline void gauss_elimination_handle_zero_row(continue_on_zero_row) {}
