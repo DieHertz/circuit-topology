@@ -20,7 +20,7 @@ template<typename T = int> matrix<T> to_incidence_matrix(const circuit& c) {
 
 template<typename T = int> circuit select_spanning_tree(const circuit& c) {
     const auto reduced_incidence = reduce_last_row(to_incidence_matrix<T>(c));
-    const auto echelon = to_echelon_matrix(reduced_incidence);
+    const auto echelon = to_echelon(reduced_incidence);
 
     const auto row_num = echelon.size();
     const auto col_num = c.size();

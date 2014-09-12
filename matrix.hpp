@@ -156,27 +156,7 @@ private:
 };
 
 template<typename T>
-bool is_zero_col(const std::size_t row_start, const std::size_t col, const matrix<T>& a) {
-    for (const auto row : ext::range(row_start, a.size())) {
-	    if (!is_equal(a[row][col], T{})) return false;
-	}
-
-	return true;
-}
-
-template<typename T> void copy_col(const matrix<T>& from, const std::size_t col_from,
-                                   matrix<T>& to, const std::size_t col_to) {
-    const auto row_num = from.size();
-    if (row_num != to.size()) {
-        throw std::logic_error{"the matrices passed to copy_col have a different number of rows"};
-    }
-
-    for (const auto row : ext::range(0, row_num)) {
-        to[row][col_to] = from[row][col_from];
-    }
-}
-
-template<typename T> inline matrix<T> reduce_last_row(const matrix<T>& m) {
+inline matrix<T> reduce_last_row(const matrix<T>& m) {
     if (m.size() < 2) throw std::logic_error{"reduce_last_row on a matrix with < 2 rows"};
 
     return { std::begin(m), --std::end(m) };
@@ -193,56 +173,118 @@ matrix<T> slice(const matrix<T>& m, const std::size_t row_num, const std::size_t
     return result;
 }
 
-template<typename T> matrix<T> to_echelon_matrix(matrix<T> a) {
-	std::size_t m{}, n{};
+template<typename T1, typename T2>
+matrix<typename std::common_type<T1, T2>::type> augment(const matrix<T1>& lhs, const matrix<T2>& rhs) {
+    const auto n = lhs.size();
+    if (n != rhs.size()) throw std::runtime_error{"cannot augment matrices with different number of rows"};
 
-	const auto row_num = a.size();
-	const auto col_num = a.front().size();
+    const auto m_lhs = lhs.front().size();
+    const auto m_rhs = rhs.front().size();
+    const auto m = m_lhs + m_rhs;
+    matrix<typename std::common_type<T1, T2>::type> result{n};
 
-	while (n < row_num && m < col_num) {
-		for (std::size_t col = m; col < col_num; ++col) {
-			if (!is_zero_col(n, col, a)) {
-				for (std::size_t row = n; row < row_num; ++row) {
-					if (a[row][col] != 0) {
-						if (row != n) std::swap(a[n], a[row]);
-						const auto el = a[n][col];
-						std::transform(std::begin(a[n]) + m, std::end(a[n]), std::begin(a[n]) + m, [&] (const T elem) {
-							return elem / el;
-						});
+    for (const auto i : ext::range(0, n)) {
+        auto& row = result[i];
+        row.reserve(m);
 
-						break;
-					}
-				}
+        std::copy(std::begin(lhs[i]), std::end(lhs[i]), std::back_inserter(row));
+        std::copy(std::begin(rhs[i]), std::end(rhs[i]), std::back_inserter(row));
+    }
 
-				for (std::size_t row = n + 1; row < row_num; ++row) {
-					if (is_zero(a[row][col])) continue;
+    return result;
+}
 
-					const auto el = a[row][col];
-					for (std::size_t k = col; k < col_num; ++k) {
-						a[row][k] -= a[n][k] * el;
-					}
-				}
+namespace {
+    struct throw_on_zero_row {};
+    struct continue_on_zero_row {};
 
-				m = col + 1;
-				++n;
+    inline void gauss_elimination_handle_zero_row(throw_on_zero_row) {
+        throw std::runtime_error{"a zero row encountered while performing elimination"};
+    }
 
-				break;
-			}
+    inline void gauss_elimination_handle_zero_row(continue_on_zero_row) {}
+}
 
-			if (col == col_num - 1) return a;
-		}
+template<typename T, typename zero_row_policy>
+matrix<T> gauss_forward_elimination_impl(matrix<T> m) {
+    const auto row_num = m.size();
+	const auto col_num = m.front().size();
+    if (row_num > col_num) {
+        throw std::runtime_error{"the number of columns must be at least the number of rows"};
+    }
+
+	std::size_t row_start{};
+
+	for (const auto col : ext::range(0, col_num)) {
+        auto non_zero_col = false;
+
+        // try to ensure non-zero element at position `col` of the main diagonal
+        if (is_equal(m[row_start][col], T{})) {
+            for (const auto row : ext::range(row_start, row_num)) {
+                if (!is_equal(m[row][col], T{})) {
+                    std::swap(row_view<T>{m, row_start}, row_view<T>{m, row});
+                    break;
+                }
+            }
+        }
+
+        const auto el = m[row_start][col];
+        if (!is_equal(el, T{})) {
+            // normalize row
+            row_view<T>{m, row_start} /= el;
+
+            // zero out all the rows below the main diagonal
+            for (const auto row : ext::range(row_start + 1, row_num)) {
+                const auto el = m[row][col];
+                if (is_equal(el, T{})) continue;
+
+                row_view<T>{m, row} -= row_view<T, matrix<T>>{m, row_start} * el;
+            }
+
+            if (++row_start == row_num) break;
+        } else gauss_elimination_handle_zero_row(zero_row_policy{});
 	}
 
-	return a;
+	return std::move(m);
+}
+
+template<typename T>
+void gauss_backward_elimination_impl(matrix<T>& m) {
+    const auto n = m.size();
+
+    for (const auto col_backwards : ext::range(0, n)) {
+        const auto col = n - col_backwards - 1;
+
+        for (const auto row_backwards : ext::range(col_backwards + 1, n)) {
+            const auto row = n - row_backwards - 1;
+            const auto el = m[row][col];
+            if (is_equal(el, T{})) continue;
+
+            row_view<T>{m, row} -= row_view<T, matrix<T>>{m, col} * el;
+        }
+    }
+}
+
+template<typename T>
+inline matrix<T> gauss_elimination(const matrix<T>& m) {
+    auto forward_eliminated = gauss_forward_elimination_impl<T, throw_on_zero_row>(m);
+    gauss_backward_elimination_impl(forward_eliminated);
+
+    return forward_eliminated;
+}
+
+template<typename T>
+inline matrix<T> to_echelon(const matrix<T>& m) {
+    return gauss_forward_elimination_impl<T, continue_on_zero_row>(m);
 }
 
 template<typename T>
 matrix<T> identity(const std::size_t n) {
-   matrix<T> result{n, std::vector<T>(n)};
+    matrix<T> result{n, std::vector<T>(n)};
 
     for (std::size_t i = 0; i < n; ++i) result[i][i] = T{1};
 
-   return result;
+    return result;
 }
 
 template<typename T>
@@ -272,58 +314,9 @@ matrix<T> transpose(const matrix<T>& mat) {
 }
 
 template<typename T>
-matrix<T> inverse(matrix<T> m) {
+matrix<T> invert(const matrix<T>& m) {
     const auto n = m.size();
-    if (n != m.front().size()) throw std::runtime_error{"cannot invert a non-square matrix"};
-
-    auto result = identity<T>(n);
-
-    // forward Gauss elimination
-    for (const auto col : ext::range(0, n)) {
-        // ensure non-zero element at position `col` of the main diagonal
-        if (is_equal(m[col][col], T{})) {
-            for (const auto row : ext::range(col + 1, n)) {
-                if (!is_equal(m[row][col], T{})) {
-                    std::swap(row_view<T>{m, col}, row_view<T>{m, row});
-                    std::swap(row_view<T>{result, col}, row_view<T>{result, row});
-                    break;
-                }
-            }
-        }
-
-        // could not find non-zero element
-        const auto el = m[col][col];
-        if (is_equal(el, T{})) throw std::runtime_error{"the matrix is singular"};
-
-        // normalize row
-        row_view<T>{m, col} /= el;
-        row_view<T>{result, col} /= el;
-
-        // zero out all the rows below the main diagonal
-        for (const auto row : ext::range(col + 1, n)) {
-            const auto el = m[row][col];
-            if (is_equal(el, T{})) continue;
-
-            row_view<T>{m, row} -= row_view<T, matrix<T>>{m, col} * el;
-            row_view<T>{result, row} -= row_view<T, matrix<T>>{result, col} * el;
-        }
-    }
-
-    // backward elimination
-    for (const auto col_backwards : ext::range(0, n)) {
-        const auto col = n - col_backwards - 1;
-
-        for (const auto row_backwards : ext::range(col_backwards + 1, n)) {
-            const auto row = n - row_backwards - 1;
-            const auto el = m[row][col];
-            if (is_equal(el, T{})) continue;
-
-            row_view<T>{m, row} -= row_view<T, matrix<T>>{m, col} * el;
-            row_view<T>{result, row} -= row_view<T, matrix<T>>{result, col} * el;
-        }
-    }
-
-    return result;
+    return slice(gauss_elimination(augment(m, identity<T>(n))), n, n, 0, n);
 }
 
 template<typename T>
