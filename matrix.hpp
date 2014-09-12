@@ -252,11 +252,8 @@ template<typename T>
 void gauss_backward_elimination_impl(matrix<T>& m) {
     const auto n = m.size();
 
-    for (const auto col_backwards : ext::range(0, n)) {
-        const auto col = n - col_backwards - 1;
-
-        for (const auto row_backwards : ext::range(col_backwards + 1, n)) {
-            const auto row = n - row_backwards - 1;
+    for (const auto col : ext::reverse_range(0, n)) {
+        for (const auto row : ext::reverse_range(col + 1, n)) {
             const auto el = m[row][col];
             if (is_equal(el, T{})) continue;
 
