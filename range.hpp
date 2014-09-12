@@ -51,13 +51,13 @@ namespace ext {
 	};
 
 	template<typename T1, typename T2>
-	range_wrapper<typename std::common_type<T1, T2>::type, true> range(T1 begin, T2 end) {
+	range_wrapper<typename std::common_type<T1, T2>::type, true> inline range(T1 begin, T2 end) {
 		using common_type = typename std::common_type<T1, T2>::type;
 		return { static_cast<common_type>(begin), static_cast<common_type>(end) };
 	}
 
 	template<typename T1, typename T2>
-	range_wrapper<typename std::common_type<T1, T2>::type, false> reverse_range(T1 begin, T2 end) {
+	range_wrapper<typename std::common_type<T1, T2>::type, false> inline reverse_range(T1 begin, T2 end) {
 		using common_type = typename std::common_type<T1, T2>::type;
 		return { static_cast<common_type>(end), static_cast<common_type>(begin) };
 	}
