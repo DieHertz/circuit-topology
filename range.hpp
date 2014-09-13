@@ -24,7 +24,7 @@ namespace ext {
 } /* namespace ext */
 
 namespace std {
-	template<> template<typename T>
+	template<typename T>
 	struct iterator_traits<ext::range_iterator<T>> {
 		using iterator_category = std::bidirectional_iterator_tag;
 		using value_type = T;

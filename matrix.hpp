@@ -167,9 +167,9 @@ matrix<T> slice(const matrix<T>& m, const std::size_t row_num, const std::size_t
                 const std::size_t row_start = 0, const std::size_t col_start = 0) {
     matrix<T> result{row_num};
 
-	for (const auto i : ext::range(0, row_num)) {
+    for (const auto i : ext::range(0, row_num)) {
     	result[i].assign(std::begin(m[row_start + i]) + col_start, std::begin(m[row_start + i]) + col_start + col_num);
-	}
+    }
 
     return result;
 }
@@ -178,41 +178,41 @@ template<typename It>
 inline void augment_impl(It&, std::size_t) {}
 template<typename It, typename Arg, typename... Args>
 inline void augment_impl(It& it, const std::size_t i, const matrix<Arg>& arg, const matrix<Args>&... args) {
-	std::copy(std::begin(arg[i]), std::end(arg[i]), it);
-	augment_impl(it, i, args...);
+    std::copy(std::begin(arg[i]), std::end(arg[i]), it);
+    augment_impl(it, i, args...);
 }
 
 inline bool check_row_num(const std::size_t) { return true; }
 template<typename Arg, typename... Args>
 inline bool check_row_num(const std::size_t row_num, const matrix<Arg>& arg, const matrix<Args>&... args) {
-	return row_num == arg.size() ? check_row_num(row_num, args...) : false;
+    return row_num == arg.size() ? check_row_num(row_num, args...) : false;
 }
 
 inline std::size_t get_total_length() { return 0; }
 template<typename Arg, typename... Args>
 inline std::size_t get_total_length(const matrix<Arg>& arg, const matrix<Args>&... args) {
-	return arg.front().size() + get_total_length(args...);
+    return arg.front().size() + get_total_length(args...);
 }
 
 template<typename Arg, typename... Args>
 matrix<typename std::common_type<Arg, Args...>::type> augment(const matrix<Arg>& arg, const matrix<Args>&... args) {
-	const auto n = arg.size();
-	if (!check_row_num(n, args...)) {
-		throw std::runtime_error{"cannot augment matrices with different number of rows"};
-	}
+    const auto n = arg.size();
+    if (!check_row_num(n, args...)) {
+	throw std::runtime_error{"cannot augment matrices with different number of rows"};
+    }
 
-	const auto m = get_total_length(arg, args...);
+    const auto m = get_total_length(arg, args...);
     matrix<typename std::common_type<Arg, Args...>::type> result{n};
 
-	for (const auto i : ext::range(0, n)) {
-		auto& row = result[i];
-		row.reserve(m);
-		auto it = std::back_inserter(row);
+    for (const auto i : ext::range(0, n)) {
+	auto& row = result[i];
+	row.reserve(m);
+	auto it = std::back_inserter(row);
 
-		augment_impl(it, i, arg, args...);
-	}
+	augment_impl(it, i, arg, args...);
+    }
 
-	return result;
+    return result;
 }
 
 namespace {
@@ -264,9 +264,9 @@ matrix<T> gauss_forward_elimination_impl(matrix<T> m) {
 
             if (++row_start == row_num) break;
         } else gauss_elimination_handle_zero_row(zero_row_policy{});
-	}
+    }
 
-	return std::move(m);
+    return std::move(m);
 }
 
 template<typename T>
@@ -300,7 +300,7 @@ template<typename T>
 matrix<T> identity(const std::size_t n) {
     matrix<T> result{n, std::vector<T>(n)};
 
-    for (std::size_t i = 0; i < n; ++i) result[i][i] = T{1};
+    for (const auto i : ext::range(0, n)) result[i][i] = T{1};
 
     return result;
 }
@@ -322,8 +322,8 @@ matrix<T> transpose(const matrix<T>& mat) {
 
     matrix<T> result{n, std::vector<T>(m)};
 
-    for (std::size_t i = 0; i < m; ++i) {
-        for (std::size_t j = 0; j < n; ++j) {
+    for (const auto i : ext::range(0, m)) {
+      for (const auto j : ext::range(0, n)) {
             result[j][i] = mat[i][j];
         }
     }
@@ -359,14 +359,14 @@ matrix<T> operator*(const matrix<T>& lhs, const matrix<T>& rhs) {
 template<typename T>
 std::ostream& operator<<(std::ostream& os, const matrix<T>& m) {
     os << "[\n";
-	for (const auto& row : m) {
-        os << '\t';
-		for (const auto& elem : row) {
-			os << elem << '\t';
-		}
-
-		os << '\n';
+    for (const auto& row : m) {
+	os << '\t';
+	for (const auto& elem : row) {
+	    os << elem << '\t';
 	}
 
-	return os << ']' << std::endl;
+	os << '\n';
+    }
+
+    return os << ']' << std::endl;
 }
