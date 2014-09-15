@@ -8,7 +8,6 @@
 #include <ostream>
 #include <cstddef>
 
-
 template<typename T, typename container> class row_view;
 
 template<typename T>
@@ -166,22 +165,6 @@ namespace std {
     void swap(row_view<T> one, row_view<T> another) { one.swap(another); }
 }
 
-template<typename T, typename container = matrix<T>&>
-class column_view {
-public:
-    column_view(container m, const std::size_t col)
-        : m(m), col{col < m.size() ? col : throw std::runtime_error{"column out of bounds"}} {}
-
-    T& operator[](const std::size_t row) { return m[row][col]; }
-    const T& operator[](const std::size_t row) const { return m[row][col]; }
-
-    std::size_t size() const { return m.size(); }
-
-private:
-    container m;
-    const std::size_t col;
-};
-
 template<typename T>
 inline matrix<T> reduce_last_row(const matrix<T>& m) {
     if (m.size() < 2) throw std::logic_error{"reduce_last_row on a matrix with < 2 rows"};
@@ -264,8 +247,6 @@ matrix<T> gauss_forward_elimination_impl(matrix<T> m) {
 	std::size_t row_start{};
 
 	for (const auto col : ext::range(0, col_num)) {
-        auto non_zero_col = false;
-
         // try to ensure non-zero element at position `col` of the main diagonal
         if (is_equal(m[row_start][col], T{})) {
             for (const auto row : ext::range(row_start, row_num)) {
