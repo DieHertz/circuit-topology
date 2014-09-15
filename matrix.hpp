@@ -8,7 +8,34 @@
 #include <ostream>
 #include <cstddef>
 
-template<typename T> using matrix = std::vector<std::vector<T>>;
+
+template<typename T, typename container> class row_view;
+
+template<typename T>
+class matrix : public std::vector<std::vector<T>> {
+public:
+    using std::vector<std::vector<T>>::vector;
+
+    row_view<T, matrix<T>&> get_row(const std::size_t row) {
+        return row_view<T, matrix<T>&>{*this, row};
+    }
+
+    row_view<T, matrix<T>> get_row(const std::size_t row) const {
+        return row_view<T, matrix<T>>{*this, row};
+    }
+
+    matrix<T> operator-() const {
+        matrix<T> result{*this};
+
+        for (auto& row : result) {
+            for (auto& item : row) {
+                item = -item;
+            }
+        }
+
+        return result;
+    }
+};
 
 template<typename T, typename container = matrix<T>&>
 class row_view {
@@ -198,18 +225,18 @@ template<typename Arg, typename... Args>
 matrix<typename std::common_type<Arg, Args...>::type> augment(const matrix<Arg>& arg, const matrix<Args>&... args) {
     const auto n = arg.size();
     if (!check_row_num(n, args...)) {
-	throw std::runtime_error{"cannot augment matrices with different number of rows"};
+        throw std::runtime_error{"cannot augment matrices with different number of rows"};
     }
 
     const auto m = get_total_length(arg, args...);
     matrix<typename std::common_type<Arg, Args...>::type> result{n};
 
     for (const auto i : ext::range(0, n)) {
-	auto& row = result[i];
-	row.reserve(m);
-	auto it = std::back_inserter(row);
+        auto& row = result[i];
+        row.reserve(m);
+        auto it = std::back_inserter(row);
 
-	augment_impl(it, i, arg, args...);
+        augment_impl(it, i, arg, args...);
     }
 
     return result;
@@ -243,7 +270,7 @@ matrix<T> gauss_forward_elimination_impl(matrix<T> m) {
         if (is_equal(m[row_start][col], T{})) {
             for (const auto row : ext::range(row_start, row_num)) {
                 if (!is_equal(m[row][col], T{})) {
-                    std::swap(row_view<T>{m, row_start}, row_view<T>{m, row});
+                    std::swap(m.get_row(row_start), m.get_row(row));
                     break;
                 }
             }
@@ -252,14 +279,14 @@ matrix<T> gauss_forward_elimination_impl(matrix<T> m) {
         const auto el = m[row_start][col];
         if (!is_equal(el, T{})) {
             // normalize row
-            row_view<T>{m, row_start} /= el;
+            m.get_row(row_start) /= el;
 
             // zero out all the rows below the main diagonal
             for (const auto row : ext::range(row_start + 1, row_num)) {
                 const auto el = m[row][col];
                 if (is_equal(el, T{})) continue;
 
-                row_view<T>{m, row} -= row_view<T, matrix<T>>{m, row_start} * el;
+                m.get_row(row) -= m.get_row(row_start) * el;
             }
 
             if (++row_start == row_num) break;
@@ -278,7 +305,7 @@ void gauss_backward_elimination_impl(matrix<T>& m) {
             const auto el = m[row][col];
             if (is_equal(el, T{})) continue;
 
-            row_view<T>{m, row} -= row_view<T, matrix<T>>{m, col} * el;
+            m.get_row(row) -= m.get_row(col) * el;
         }
     }
 }
@@ -303,17 +330,6 @@ matrix<T> identity(const std::size_t n) {
     for (const auto i : ext::range(0, n)) result[i][i] = T{1};
 
     return result;
-}
-
-template<typename T>
-matrix<T> negate(matrix<T> m) {
-    for (auto& row : m) {
-        for (auto& item : row) {
-            item = -item;
-        }
-    }
-
-    return m;
 }
 
 template<typename T>
@@ -359,13 +375,14 @@ matrix<T> operator*(const matrix<T>& lhs, const matrix<T>& rhs) {
 template<typename T>
 std::ostream& operator<<(std::ostream& os, const matrix<T>& m) {
     os << "[\n";
-    for (const auto& row : m) {
-	os << '\t';
-	for (const auto& elem : row) {
-	    os << elem << '\t';
-	}
 
-	os << '\n';
+    for (const auto& row : m) {
+		os << '\t';
+		for (const auto& elem : row) {
+			os << elem << '\t';
+        }
+
+        os << '\n';
     }
 
     return os << ']' << std::endl;

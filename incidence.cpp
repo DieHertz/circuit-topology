@@ -2,7 +2,7 @@
 #include <iostream>
 
 const auto pretty_print = [] (const circuit& c, const matrix<int>& m, const std::string& name, const std::string& sym) {
-    std::cout << name << ":\n";
+    std::cout << name << ":\n[\n";
 
     for (const auto row : ext::range(0, m.size())) {
         auto first = true;
@@ -12,7 +12,7 @@ const auto pretty_print = [] (const circuit& c, const matrix<int>& m, const std:
             if (is_equal(el, 0)) continue;
 
             if (first) {
-                if (is_equal(el, -1)) std::cout << '-';
+				std::cout << '\t' << (is_equal(el, -1) ? "-" : "");
             } else {
                 std::cout << ' ' << (is_equal(el, 1) ? '+' : '-') << ' ';
             }
@@ -24,7 +24,7 @@ const auto pretty_print = [] (const circuit& c, const matrix<int>& m, const std:
         std::cout << " = 0\n";
     }
 
-    std::cout << std::endl;
+    std::cout << ']' << std::endl;
 };
 
 void test() {
@@ -61,11 +61,11 @@ void test() {
     const auto a_t = slice(a, independent_node_num, independent_node_num);
     const auto a_l = slice(a, independent_node_num, branch_num - independent_node_num, 0, independent_node_num);
 
-    const auto b_t = transpose(negate(invert(a_t) * a_l));
+    const auto b_t = transpose(-(invert(a_t) * a_l));
     const auto b = augment(b_t, identity<int>(b_t.size()));
     std::cout << "B[B_T | 1]:\n" << b << std::endl;
 
-    const auto d_l = transpose(negate(b_t));
+    const auto d_l = transpose(-b_t);
     const auto d = augment(identity<int>(d_l.size()), d_l);
     std::cout << "D[1 | D_L]:\n" << d << std::endl;
 
@@ -119,11 +119,11 @@ void book_example() {
     const auto a_t = slice(a, independent_node_num, independent_node_num);
     const auto a_l = slice(a, independent_node_num, branch_num - independent_node_num, 0, independent_node_num);
 
-    const auto b_t = transpose(negate(invert(a_t) * a_l));
+    const auto b_t = transpose(-(invert(a_t) * a_l));
     const auto b = augment(b_t, identity<int>(b_t.size()));
     std::cout << "B[B_T | 1]:\n" << b << std::endl;
 
-    const auto d_l = transpose(negate(b_t));
+    const auto d_l = transpose(-b_t);
     const auto d = augment(identity<int>(d_l.size()), d_l);
     std::cout << "D[1 | D_l]:\n" << d << std::endl;
 
