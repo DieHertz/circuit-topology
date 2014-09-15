@@ -282,7 +282,7 @@ void gauss_backward_elimination_impl(matrix<T>& m) {
     const auto n = m.size();
 
     for (const auto col : ext::reverse_range(0, n)) {
-        for (const auto row : ext::reverse_range(col + 1, n)) {
+        for (const auto row : ext::reverse_range(0, col)) {
             const auto el = m[row][col];
             if (is_equal(el, T{})) continue;
 

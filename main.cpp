@@ -107,12 +107,6 @@ void book_example() {
     const auto c_with_tree = select_spanning_tree(c_normalized);
     std::cout << "circuit with spanning tree in left rows:\n" << c_with_tree << std::endl;
 
-    // const matrix<int> a{
-    //     { 1, 1, 0, 0, 0, 0, -1 },
-    //     { -1, 0, 0, 1, -1, 0, 0 },
-    //     { 0, 0, 0, -1, 0, 1, 0 },
-    //     { 0, 0, -1, 0, 1, -1, 1 }
-    // };
     const auto a = reduce_last_row(to_incidence_matrix(c_with_tree));
     std::cout << "A[A_T | A_L]:\n" << a << std::endl;
 
