@@ -13,7 +13,7 @@ namespace ext {
 	template<typename T> struct range_iterator {
 		T current;
 
-		T& operator*() { return current; }
+		T operator*() { return current; }
 
 		range_iterator& operator++() { return ++current, *this; }
 		range_iterator& operator--() { return --current, *this; }
@@ -29,8 +29,8 @@ namespace std {
 		using iterator_category = std::bidirectional_iterator_tag;
 		using value_type = T;
 		using difference_type = T;
-		using pointer = T*;
-		using reference = T&;
+		using pointer = void;
+		using reference = T;
 	};
 } /* namespace std */
 
