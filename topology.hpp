@@ -5,7 +5,7 @@
 #include "range.hpp"
 
 /// @todo assert no closed loop on edges
-template<typename T = int> matrix<T> to_incidence_matrix(const circuit& c) {
+template<typename T = int> matrix<T> to_incidence(const circuit& c) {
     const auto node_num = count_nodes(c);
     const auto circuit_size = c.size();
     matrix<T> incidence{node_num, std::vector<T>(circuit_size)};
@@ -19,8 +19,8 @@ template<typename T = int> matrix<T> to_incidence_matrix(const circuit& c) {
 }
 
 template<typename T = int> circuit select_spanning_tree(const circuit& c) {
-    const auto reduced_incidence = reduce_last_row(to_incidence_matrix<T>(c));
-    const auto echelon = to_echelon(reduced_incidence);
+    const auto reduced_incidence = reduce_last_row(to_incidence<T>(c));
+    const auto echelon = echelonize(reduced_incidence);
 
     const auto row_num = echelon.size();
     const auto col_num = c.size();

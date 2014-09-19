@@ -300,7 +300,7 @@ inline matrix<T> gauss_elimination(const matrix<T>& m) {
 }
 
 template<typename T>
-inline matrix<T> to_echelon(const matrix<T>& m) {
+inline matrix<T> echelonize(const matrix<T>& m) {
     return gauss_forward_elimination_impl<T, continue_on_zero_row>(m);
 }
 

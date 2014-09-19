@@ -1,5 +1,5 @@
 CC=g++
-CXX_FLAGS=-std=c++11 -Wall -Werror
+CXX_FLAGS=-std=c++11 -Wall -Werror -g
 
 OUT_NAME=main
 
