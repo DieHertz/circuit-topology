@@ -31,7 +31,7 @@ bool is_voltage_defined(const element_type& type) {
    static const std::map<element_type, bool> map{
     	{ element_type::voltage_source, true },
     	{ element_type::capacitor, false },
-    	{ element_type::resistor, true },
+    	{ element_type::resistor, false },
     	{ element_type::inductor, true },
     	{ element_type::current_source, false }
     };
@@ -70,17 +70,6 @@ struct element {
     bool is_voltage_defined() const { return ::is_voltage_defined(type); }
     bool is_current_defined() const { return ::is_current_defined(type); }
     bool is_source() const { return ::is_source(type); }
-
-    std::string get_branch_constitutive_equation() const {
-        switch (type) {
-        case element_type::voltage_source: return "U(" + name + ") = " + name;
-    	case element_type::capacitor: return "I(" + name + ") = " + name + " * dU(" + name + ")/dt";
-    	case element_type::resistor: return "U(" + name + ") = " + name + " * I(" + name + ")";
-    	case element_type::inductor: return "U(" + name + ") = " + name + " * dI(" + name + ")/dt";
-    	case element_type::current_source: return "I(" + name + ") = " + name;
-        default: throw std::logic_error{"invalid element_type value"};
-        };
-    }
 };
 
 inline bool operator<(const element& lhs, const element& rhs) {

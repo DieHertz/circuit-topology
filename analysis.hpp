@@ -4,6 +4,7 @@
 #include "matrix.hpp"
 #include "topology.hpp"
 #include <vector>
+#include <unordered_map>
 #include <ostream>
 
 struct equation_term {
@@ -19,7 +20,7 @@ std::ostream& operator<<(std::ostream& os, const equation& equation) {
         os << (first ? term.sign ? "-" : "" : term.sign ? " - " : " + ") << term.expr;
         first = false;
     }
-    os << " = 0";
+    if (!first) os << " = 0";
 
     return os;
 }
@@ -36,8 +37,22 @@ std::ostream& operator<<(std::ostream& os, const equations& equations) {
 
 struct system_of_equations {
     std::vector<std::string> unknowns;
-    equation equations;
+    equations equations;
 };
+
+std::ostream& operator<<(std::ostream& os, const system_of_equations& system) {
+    os << "unknowns: (";
+
+    auto first = true;
+    for (const auto& unknown : system.unknowns) {
+        os << (first ? "" : ", ") << unknown;
+        first = false;
+    }
+
+    os << ")^T\n" << system.equations;
+
+    return os;
+}
 
 template<typename T> class analysis {
 public:
@@ -54,6 +69,65 @@ public:
     equations get_kcl_equations() const { return matrix_to_equations(d, "I"); }
     equations get_kvl_equations() const { return matrix_to_equations(b, "U"); }
 
+    system_of_equations get_model_equations() const {
+        // select unknowns: each node's potential, current through voltage-defined branches
+        std::vector<std::string> unknowns{node_num};
+        equations equations{node_num};
+        const auto voltage_potentials = get_voltage_potential_map(incidence, circuit);
+
+        for (const auto node : ext::range(0, node_num)) {
+            unknowns[node] = "V_" + std::to_string(node);
+            for (const auto branch : ext::range(0, branch_num)) {
+                const auto el = incidence[node][branch];
+                if (el == 0) continue;
+
+                auto& element = circuit[branch];
+                // leave voltage-defined elements as is
+                if (element.is_voltage_defined()) {
+                    equations[node].push_back({ "I_" + element.name, el < 0 });
+                } else {
+                    // express branch voltage in terms of node potentials
+                    const auto potential_it = voltage_potentials.find(element.name);
+
+                    if (element.type == element_type::capacitor) {
+                        for (const auto& potential : potential_it->second) {
+                            equations[node].push_back({
+                                element.name + " * d" + potential.expr + "/dt",
+                                static_cast<bool>((el < 0) ^ potential.sign)
+                            });
+                        }
+                    } else if (element.type == element_type::resistor) {
+                        for (const auto& potential : potential_it->second) {
+                            equations[node].push_back({
+                                "1 / " + element.name + " * " + potential.expr,
+                                static_cast<bool>((el < 0) ^ potential.sign)
+                            });
+                        }
+                    } else if (element.type == element_type::current_source) {
+                        equations[node].push_back({ element.name, el < 0 });
+                    }
+                }
+            }
+        }
+
+        for (const auto& element : circuit) {
+            if (element.is_voltage_defined()) {
+                unknowns.emplace_back("I_" + element.name);
+
+                const auto potential_it = voltage_potentials.find(element.name);
+                if (element.type == element_type::voltage_source) {
+                    equations.emplace_back(potential_it->second);
+                    equations.back().push_back({ element.name, true });
+                } else if (element.type == element_type::inductor) {
+                    equations.emplace_back(potential_it->second);
+                    equations.back().push_back({ element.name + " * dI_" + element.name + "/dt", true });
+                }
+            }
+        }
+
+        return { std::move(unknowns), std::move(equations) };
+    }
+
 private:
     equations matrix_to_equations(const matrix<int>& m, const std::string& symbol) const {
         equations result{m.size()};
@@ -61,7 +135,23 @@ private:
         for (const auto i : ext::range(0, m.size())) {
             for (const auto branch : ext::range(0, branch_num)) {
                 const auto el = m[i][branch];
-                if (el != 0) result[i].push_back({ symbol + '(' + circuit[branch].name + ')', el < 0 });
+                if (el != 0) result[i].push_back({ symbol + '_' + circuit[branch].name, el < 0 });
+            }
+        }
+
+        return result;
+    }
+
+    using voltage_potential_map = std::unordered_map<std::string, equation>;
+
+    static voltage_potential_map get_voltage_potential_map(const matrix<int>& incidence, const circuit& circuit) {
+        voltage_potential_map result{};
+
+        for (const auto branch : ext::range(0, circuit.size())) {
+            auto& item = result[circuit[branch].name];
+            for (const auto node : ext::range(0, incidence.size())) {
+                const auto el = incidence[node][branch];
+                if (el != 0) item.push_back({ "V_" + std::to_string(node), el < 0 });
             }
         }
 

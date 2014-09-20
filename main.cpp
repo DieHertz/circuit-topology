@@ -11,6 +11,5 @@ int main() {
     };
 
     const analysis<float> nodal_analyzer{c};
-    std::cout << "KCL:\n" << nodal_analyzer.get_kcl_equations() << std::endl;
-    std::cout << "KVL:\n" << nodal_analyzer.get_kvl_equations() << std::endl;
+    std::cout << nodal_analyzer.get_model_equations() << std::endl;
 }
