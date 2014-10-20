@@ -25,9 +25,9 @@ std::ostream& operator<<(std::ostream& os, const equation& equation) {
     return os;
 }
 
-using equations = std::vector<equation>;
+using equations_t = std::vector<equation>;
 
-std::ostream& operator<<(std::ostream& os, const equations& equations) {
+std::ostream& operator<<(std::ostream& os, const equations_t& equations) {
     for (const auto& equation : equations) {
         os << equation << '\n';
     }
@@ -37,7 +37,7 @@ std::ostream& operator<<(std::ostream& os, const equations& equations) {
 
 struct system_of_equations {
     std::vector<std::string> unknowns;
-    equations equations;
+    equations_t equations;
 };
 
 std::ostream& operator<<(std::ostream& os, const system_of_equations& system) {
@@ -56,24 +56,24 @@ std::ostream& operator<<(std::ostream& os, const system_of_equations& system) {
 
 template<typename T> class analysis {
 public:
-    analysis(const circuit& cir)
-        : circuit{select_spanning_tree(normalize(cir))}
-        , incidence{reduce_last_row(to_incidence(circuit))}
-        , node_num{incidence.size()}, branch_num{circuit.size()}
+    analysis(const circuit& circuit)
+        : cir{select_spanning_tree(normalize(circuit))}
+        , incidence{reduce_last_row(to_incidence(cir))}
+        , node_num{incidence.size()}, branch_num{cir.size()}
         , incidence_tree{slice(incidence, node_num, node_num)}
         , incidence_links{slice(incidence, node_num, branch_num - node_num, 0, node_num)}
         , b{augment(-transpose((invert(incidence_tree) * incidence_links)), identity<int>(branch_num - node_num))}
         , d{augment(identity<int>(node_num), -transpose(slice(b, branch_num - node_num, node_num)))}
     {}
 
-    equations get_kcl_equations() const { return matrix_to_equations(d, "I"); }
-    equations get_kvl_equations() const { return matrix_to_equations(b, "U"); }
+    equations_t get_kcl_equations() const { return matrix_to_equations(d, "I"); }
+    equations_t get_kvl_equations() const { return matrix_to_equations(b, "U"); }
 
     system_of_equations get_model_equations() const {
         // select unknowns: each node's potential, current through voltage-defined branches
         std::vector<std::string> unknowns{node_num};
-        equations equations{node_num};
-        const auto voltage_potentials = get_voltage_potential_map(incidence, circuit);
+        equations_t equations{node_num};
+        const auto voltage_potentials = get_voltage_potential_map(incidence, cir);
 
         for (const auto node : ext::range(0, node_num)) {
             unknowns[node] = "V_" + std::to_string(node);
@@ -81,7 +81,7 @@ public:
                 const auto el = incidence[node][branch];
                 if (el == 0) continue;
 
-                auto& element = circuit[branch];
+                auto& element = cir[branch];
                 // leave voltage-defined elements as is
                 if (element.is_voltage_defined()) {
                     equations[node].push_back({ "I_" + element.name, el < 0 });
@@ -110,7 +110,7 @@ public:
             }
         }
 
-        for (const auto& element : circuit) {
+        for (const auto& element : cir) {
             if (element.is_voltage_defined()) {
                 unknowns.emplace_back("I_" + element.name);
 
@@ -129,13 +129,13 @@ public:
     }
 
 private:
-    equations matrix_to_equations(const matrix<int>& m, const std::string& symbol) const {
-        equations result{m.size()};
+    equations_t matrix_to_equations(const matrix<int>& m, const std::string& symbol) const {
+        equations_t result{m.size()};
 
         for (const auto i : ext::range(0, m.size())) {
             for (const auto branch : ext::range(0, branch_num)) {
                 const auto el = m[i][branch];
-                if (el != 0) result[i].push_back({ symbol + '_' + circuit[branch].name, el < 0 });
+                if (el != 0) result[i].push_back({ symbol + '_' + cir[branch].name, el < 0 });
             }
         }
 
@@ -158,7 +158,7 @@ private:
         return result;
     }
 
-    const circuit circuit;
+    const circuit cir;
     const matrix<int> incidence;
     const std::size_t node_num;
     const std::size_t branch_num;
